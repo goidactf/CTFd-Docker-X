@@ -42,13 +42,14 @@ function get_docker_status(container) {
 
                     ports.forEach((port) => {
                         port = String(port);
+                        let port_no_proto = port.split("/")[0];
                         data =
                             data +
                             "Host: " +
                             item.host +
                             " Port: " +
                             port +
-                            `<a href='http://${item.host}:${port}/'>${link_svg}</a><br />`;
+                            ` <a href='http://${item.host}:${port_no_proto}/'>${link_svg}</a><br />`; // todo: skip non-tcp?
                     });
                     // Update the DOM with the docker container information
                     CTFd.lib
