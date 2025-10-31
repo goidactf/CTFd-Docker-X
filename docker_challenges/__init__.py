@@ -52,8 +52,8 @@ from pathlib import Path
 
 class DockerConfig(db.Model):
     """
-	Docker Config Model. This model stores the config for docker API connections.
-	"""
+    Docker Config Model. This model stores the config for docker API connections.
+    """
     id = db.Column(db.Integer, primary_key=True)
     hostname = db.Column("hostname", db.String(64), index=True)
     tls_enabled = db.Column("tls_enabled", db.Boolean, default=False, index=True)
@@ -65,8 +65,8 @@ class DockerConfig(db.Model):
 
 class DockerChallengeTracker(db.Model):
     """
-	Docker Container Tracker. This model stores the users/teams active docker containers.
-	"""
+    Docker Container Tracker. This model stores the users/teams active docker containers.
+    """
     id = db.Column(db.Integer, primary_key=True)
     team_id = db.Column("team_id", db.String(64), index=True)
     user_id = db.Column("user_id", db.String(64), index=True)
@@ -77,6 +77,7 @@ class DockerChallengeTracker(db.Model):
     ports = db.Column('ports', db.String(128), index=True)
     host = db.Column('host', db.String(128), index=True)
     challenge = db.Column('challenge', db.String(256), index=True)
+
 
 class DockerConfigForm(BaseForm):
     id = HiddenField()
@@ -120,9 +121,12 @@ def define_docker_admin(app):
             except:
                 traceback.print_exc()
                 client_key = ''
-            if len(ca_cert) != 0: b.ca_cert = ca_cert
-            if len(client_cert) != 0: b.client_cert = client_cert
-            if len(client_key) != 0: b.client_key = client_key
+            if len(ca_cert) != 0:
+                b.ca_cert = ca_cert
+            if len(client_cert) != 0:
+                b.client_cert = client_cert
+            if len(client_key) != 0:
+                b.client_key = client_key
             b.hostname = request.form['hostname']
             b.tls_enabled = request.form['tls_enabled']
             if b.tls_enabled == "True":
@@ -324,7 +328,7 @@ def create_container(docker, image, team, portbl):
     if tls:
         cert, verify = get_client_cert(docker)
         r = requests.post(url="%s/containers/create?name=%s" % (URL_TEMPLATE, container_name), cert=cert,
-                      verify=verify, data=data, headers=headers)
+                          verify=verify, data=data, headers=headers)
         result = r.json()
         s = requests.post(url="%s/containers/%s/start" % (URL_TEMPLATE, result['Id']), cert=cert, verify=verify,
                           headers=headers)
@@ -369,13 +373,13 @@ class DockerChallengeType(BaseChallenge):
     @staticmethod
     def update(challenge, request):
         """
-		This method is used to update the information associated with a challenge. This should be kept strictly to the
-		Challenges table and any child tables.
+                This method is used to update the information associated with a challenge. This should be kept strictly to the
+                Challenges table and any child tables.
 
-		:param challenge:
-		:param request:
-		:return:
-		"""
+                :param challenge:
+                :param request:
+                :return:
+                """
         data = request.form or request.get_json()
         for attr, value in data.items():
             setattr(challenge, attr, value)
@@ -386,12 +390,12 @@ class DockerChallengeType(BaseChallenge):
     @staticmethod
     def delete(challenge):
         """
-		This method is used to delete the resources used by a challenge.
-		NOTE: Will need to kill all containers here
+        This method is used to delete the resources used by a challenge.
+        NOTE: Will need to kill all containers here
 
-		:param challenge:
-		:return:
-		"""
+        :param challenge:
+        :return:
+         """
         Fails.query.filter_by(challenge_id=challenge.id).delete()
         Solves.query.filter_by(challenge_id=challenge.id).delete()
         Flags.query.filter_by(challenge_id=challenge.id).delete()
@@ -408,11 +412,11 @@ class DockerChallengeType(BaseChallenge):
     @staticmethod
     def read(challenge):
         """
-		This method is in used to access the data of a challenge in a format processable by the front end.
+        This method is in used to access the data of a challenge in a format processable by the front end.
 
-		:param challenge:
-		:return: Challenge object, data dictionary to be returned to the user
-		"""
+        :param challenge:
+        :return: Challenge object, data dictionary to be returned to the user
+        """
         challenge = DockerChallenge.query.filter_by(id=challenge.id).first()
         data = {
             'id': challenge.id,
@@ -436,11 +440,11 @@ class DockerChallengeType(BaseChallenge):
     @staticmethod
     def create(request):
         """
-		This method is used to process the challenge creation request.
+        This method is used to process the challenge creation request.
 
-		:param request:
-		:return:
-		"""
+        :param request:
+        :return:
+        """
         data = request.form or request.get_json()
         challenge = DockerChallenge(**data)
         db.session.add(challenge)
@@ -450,14 +454,14 @@ class DockerChallengeType(BaseChallenge):
     @staticmethod
     def attempt(challenge, request):
         """
-		This method is used to check whether a given input is right or wrong. It does not make any changes and should
-		return a boolean for correctness and a string to be shown to the user. It is also in charge of parsing the
-		user's input from the request itself.
+        This method is used to check whether a given input is right or wrong. It does not make any changes and should
+        return a boolean for correctness and a string to be shown to the user. It is also in charge of parsing the
+        user's input from the request itself.
 
-		:param challenge: The Challenge object from the database
-		:param request: The request the user submitted
-		:return: (boolean, string)
-		"""
+        :param challenge: The Challenge object from the database
+        :param request: The request the user submitted
+        :return: (boolean, string)
+        """
 
         data = request.form or request.get_json()
         print(request.get_json())
@@ -472,13 +476,13 @@ class DockerChallengeType(BaseChallenge):
     @staticmethod
     def solve(user, team, challenge, request):
         """
-		This method is used to insert Solves into the database in order to mark a challenge as solved.
+                This method is used to insert Solves into the database in order to mark a challenge as solved.
 
-		:param team: The Team object from the database
-		:param chal: The Challenge object from the database
-		:param request: The request the user submitted
-		:return:
-		"""
+                :param team: The Team object from the database
+                :param chal: The Challenge object from the database
+                :param request: The request the user submitted
+                :return:
+                """
         data = request.form or request.get_json()
         submission = data["submission"].strip()
         docker = DockerConfig.query.filter_by(id=1).first()
@@ -503,18 +507,18 @@ class DockerChallengeType(BaseChallenge):
         db.session.add(solve)
         db.session.commit()
         # trying if this solces the detached instance error...
-        #db.session.close()
+        # db.session.close()
 
     @staticmethod
     def fail(user, team, challenge, request):
         """
-		This method is used to insert Fails into the database in order to mark an answer incorrect.
+                This method is used to insert Fails into the database in order to mark an answer incorrect.
 
-		:param team: The Team object from the database
-		:param chal: The Challenge object from the database
-		:param request: The request the user submitted
-		:return:
-		"""
+                :param team: The Team object from the database
+                :param chal: The Challenge object from the database
+                :param request: The request the user submitted
+                :return:
+                """
         data = request.form or request.get_json()
         submission = data["submission"].strip()
         wrong = Fails(
@@ -526,7 +530,7 @@ class DockerChallengeType(BaseChallenge):
         )
         db.session.add(wrong)
         db.session.commit()
-        #db.session.close()
+        # db.session.close()
 
 
 class DockerChallenge(Challenges):
@@ -550,11 +554,11 @@ class ContainerAPI(Resource):
         challenge = request.args.get('challenge')
         if not challenge:
             return abort(403, "No challenge name specified")
-        
+
         docker = DockerConfig.query.filter_by(id=1).first()
         containers = DockerChallengeTracker.query.all()
         if container not in get_repositories(docker, tags=True):
-            return abort(403,f"Container {container} not present in the repository.")
+            return abort(403, f"Container {container} not present in the repository.")
         if is_teams_mode():
             session = get_current_team()
             # First we'll delete all old docker containers (+2 hours)
@@ -572,10 +576,10 @@ class ContainerAPI(Resource):
                     DockerChallengeTracker.query.filter_by(instance_id=i.instance_id).delete()
                     db.session.commit()
             check = DockerChallengeTracker.query.filter_by(user_id=session.id).filter_by(docker_image=container).first()
-        
+
         # If this container is already created, we don't need another one.
-        if check != None and not (unix_time(datetime.utcnow()) - int(check.timestamp)) >= 300:
-            return abort(403,"To prevent abuse, dockers can be reverted and stopped after 5 minutes of creation.")
+        if check != None and not (unix_time(datetime.utcnow()) - int(check.timestamp)) >= 180:
+            return abort(403, "To prevent abuse, dockers can be reverted and stopped after 3 minutes of creation.")
         # Delete when requested
         elif check != None and request.args.get('stopcontainer'):
             delete_container(docker, check.instance_id)
@@ -585,7 +589,7 @@ class ContainerAPI(Resource):
                 DockerChallengeTracker.query.filter_by(user_id=session.id).filter_by(docker_image=container).delete()
             db.session.commit()
             return {"result": "Container stopped"}
-        # The exception would be if we are reverting a box. So we'll delete it if it exists and has been around for more than 5 minutes.
+        # The exception would be if we are reverting a box. So we'll delete it if it exists and has been around for more than 3 minutes.
         elif check != None:
             delete_container(docker, check.instance_id)
             if is_teams_mode():
@@ -593,12 +597,12 @@ class ContainerAPI(Resource):
             else:
                 DockerChallengeTracker.query.filter_by(user_id=session.id).filter_by(docker_image=container).delete()
             db.session.commit()
-        
+
         # Check if a container is already running for this user. We need to recheck the DB first
         containers = DockerChallengeTracker.query.all()
         for i in containers:
             if int(session.id) == int(i.user_id):
-                return abort(403,f"Another container is already running for challenge:<br><i><b>{i.challenge}</b></i>.<br>Please stop this first.<br>You can only run one container.")
+                return abort(403, f"Another container is already running for challenge:<br><i><b>{i.challenge}</b></i>.<br>Please stop this first.<br>You can only run one container.")
 
         portsbl = get_unavailable_ports(docker)
         create = create_container(docker, container, session.name, portsbl)
@@ -608,7 +612,7 @@ class ContainerAPI(Resource):
             user_id=session.id if not is_teams_mode() else None,
             docker_image=container,
             timestamp=unix_time(datetime.utcnow()),
-            revert_time=unix_time(datetime.utcnow()) + 300,
+            revert_time=unix_time(datetime.utcnow()) + 180,
             instance_id=create[0]['Id'],
             ports=','.join([p[0]['HostPort'] for p in ports]),
             host=str(docker.hostname).split(':')[0],
@@ -616,7 +620,7 @@ class ContainerAPI(Resource):
         )
         db.session.add(entry)
         db.session.commit()
-        #db.session.close()
+        # db.session.close()
         return
 
 
@@ -626,9 +630,9 @@ active_docker_namespace = Namespace("docker", description='Endpoint to retrieve 
 @active_docker_namespace.route("", methods=['POST', 'GET'])
 class DockerStatus(Resource):
     """
-	The Purpose of this API is to retrieve a public JSON string of all docker containers
-	in use by the current team/user.
-	"""
+    The Purpose of this API is to retrieve a public JSON string of all docker containers
+    in use by the current team/user.
+    """
 
     @authed_only
     def get(self):
@@ -664,9 +668,9 @@ docker_namespace = Namespace("docker", description='Endpoint to retrieve dockers
 @docker_namespace.route("", methods=['POST', 'GET'])
 class DockerAPI(Resource):
     """
-	This is for creating Docker Challenges. The purpose of this API is to populate the Docker Image Select form
-	object in the Challenge Creation Screen.
-	"""
+    This is for creating Docker Challenges. The purpose of this API is to populate the Docker Image Select form
+    object in the Challenge Creation Screen.
+    """
 
     @admins_only
     def get(self):
@@ -682,19 +686,19 @@ class DockerAPI(Resource):
             }
         else:
             return {
-                       'success': False,
-                       'data': [
-                           {
-                               'name': 'Error in Docker Config!'
-                           }
-                       ]
-                   }, 400
-
+                'success': False,
+                'data': [
+                    {
+                        'name': 'Error in Docker Config!'
+                    }
+                ]
+            }, 400
 
 
 def load(app):
     app.db.create_all()
     CHALLENGE_CLASSES['docker'] = DockerChallengeType
+
     @app.template_filter('datetimeformat')
     def datetimeformat(value, format='%Y-%m-%d %H:%M:%S'):
         return datetime.fromtimestamp(value).strftime(format)
