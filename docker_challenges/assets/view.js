@@ -49,7 +49,7 @@ function get_docker_status(container) {
                             item.host +
                             " Port: " +
                             port +
-                            ` <a href='http://${item.host}:${port_no_proto}/'>${link_svg}</a><br />`; // todo: skip non-tcp?
+                            ` <a href='http://${item.host}:${port_no_proto}/' target="_blank" rel="noopener noreferrer">${link_svg}</a><br />`; // todo: skip non-tcp?
                     });
                     // Update the DOM with the docker container information
                     CTFd.lib
