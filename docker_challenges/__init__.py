@@ -373,13 +373,13 @@ class DockerChallengeType(BaseChallenge):
     @staticmethod
     def update(challenge, request):
         """
-                This method is used to update the information associated with a challenge. This should be kept strictly to the
-                Challenges table and any child tables.
+        This method is used to update the information associated with a challenge. This should be kept strictly to the
+        Challenges table and any child tables.
 
-                :param challenge:
-                :param request:
-                :return:
-                """
+        :param challenge:
+        :param request:
+        :return:
+        """
         data = request.form or request.get_json()
         for attr, value in data.items():
             setattr(challenge, attr, value)
@@ -395,7 +395,7 @@ class DockerChallengeType(BaseChallenge):
 
         :param challenge:
         :return:
-         """
+        """
         Fails.query.filter_by(challenge_id=challenge.id).delete()
         Solves.query.filter_by(challenge_id=challenge.id).delete()
         Flags.query.filter_by(challenge_id=challenge.id).delete()
@@ -476,13 +476,13 @@ class DockerChallengeType(BaseChallenge):
     @staticmethod
     def solve(user, team, challenge, request):
         """
-                This method is used to insert Solves into the database in order to mark a challenge as solved.
+        This method is used to insert Solves into the database in order to mark a challenge as solved.
 
-                :param team: The Team object from the database
-                :param chal: The Challenge object from the database
-                :param request: The request the user submitted
-                :return:
-                """
+        :param team: The Team object from the database
+        :param chal: The Challenge object from the database
+        :param request: The request the user submitted
+        :return:
+        """
         data = request.form or request.get_json()
         submission = data["submission"].strip()
         docker = DockerConfig.query.filter_by(id=1).first()
@@ -512,13 +512,13 @@ class DockerChallengeType(BaseChallenge):
     @staticmethod
     def fail(user, team, challenge, request):
         """
-                This method is used to insert Fails into the database in order to mark an answer incorrect.
+        This method is used to insert Fails into the database in order to mark an answer incorrect.
 
-                :param team: The Team object from the database
-                :param chal: The Challenge object from the database
-                :param request: The request the user submitted
-                :return:
-                """
+        :param team: The Team object from the database
+        :param chal: The Challenge object from the database
+        :param request: The request the user submitted
+        :return:
+        """
         data = request.form or request.get_json()
         submission = data["submission"].strip()
         wrong = Fails(
@@ -546,7 +546,7 @@ container_namespace = Namespace("container", description='Endpoint to interact w
 @container_namespace.route("", methods=['POST', 'GET'])
 class ContainerAPI(Resource):
     @authed_only
-    # I wish this was Post... Issues with API/CSRF and whatnot. Open to a Issue solving this.
+    # TODO: I wish this was Post... Issues with API/CSRF and whatnot. Open to a Issue solving this.
     def get(self):
         container = request.args.get('name')
         if not container:
@@ -562,24 +562,25 @@ class ContainerAPI(Resource):
         if is_teams_mode():
             session = get_current_team()
             # First we'll delete all old docker containers (+2 hours)
-            for i in containers:
-                if int(session.id) == int(i.team_id) and (unix_time(datetime.utcnow()) - int(i.timestamp)) >= 7200:
-                    delete_container(docker, i.instance_id)
-                    DockerChallengeTracker.query.filter_by(instance_id=i.instance_id).delete()
+            for cont in containers:
+                if int(session.id) == int(cont.team_id) and (unix_time(datetime.utcnow()) - int(cont.timestamp)) >= 7200:
+                    delete_container(docker, cont.instance_id)
+                    DockerChallengeTracker.query.filter_by(instance_id=cont.instance_id).delete()
                     db.session.commit()
             check = DockerChallengeTracker.query.filter_by(team_id=session.id).filter_by(docker_image=container).first()
         else:
             session = get_current_user()
-            for i in containers:
-                if int(session.id) == int(i.user_id) and (unix_time(datetime.utcnow()) - int(i.timestamp)) >= 7200:
-                    delete_container(docker, i.instance_id)
-                    DockerChallengeTracker.query.filter_by(instance_id=i.instance_id).delete()
+            for cont in containers:
+                if int(session.id) == int(cont.user_id) and (unix_time(datetime.utcnow()) - int(cont.timestamp)) >= 7200:
+                    delete_container(docker, cont.instance_id)
+                    DockerChallengeTracker.query.filter_by(instance_id=cont.instance_id).delete()
                     db.session.commit()
             check = DockerChallengeTracker.query.filter_by(user_id=session.id).filter_by(docker_image=container).first()
 
         # If this container is already created, we don't need another one.
         if check != None and not (unix_time(datetime.utcnow()) - int(check.timestamp)) >= 180:
             return abort(403, "To prevent abuse, dockers can be reverted and stopped after 3 minutes of creation.")
+
         # Delete when requested
         elif check != None and request.args.get('stopcontainer'):
             delete_container(docker, check.instance_id)
@@ -590,6 +591,7 @@ class ContainerAPI(Resource):
             db.session.commit()
             return {"result": "Container stopped"}
         # The exception would be if we are reverting a box. So we'll delete it if it exists and has been around for more than 3 minutes.
+
         elif check != None:
             delete_container(docker, check.instance_id)
             if is_teams_mode():
@@ -600,9 +602,9 @@ class ContainerAPI(Resource):
 
         # Check if a container is already running for this user. We need to recheck the DB first
         containers = DockerChallengeTracker.query.all()
-        for i in containers:
-            if int(session.id) == int(i.user_id):
-                return abort(403, f"Another container is already running for challenge:<br><i><b>{i.challenge}</b></i>.<br>Please stop this first.<br>You can only run one container.")
+        for cont in containers:
+            if int(session.id) == int(cont.user_id):
+                return abort(403, f"Another container is already running for challenge:<br><i><b>{cont.challenge}</b></i>.<br>Please stop this first.<br>You can only run one container.")
 
         portsbl = get_unavailable_ports(docker)
         create = create_container(docker, container, session.name, portsbl)
