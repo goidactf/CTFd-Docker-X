@@ -99,7 +99,7 @@ function get_docker_status(container) {
                     var countDownDate = new Date(
                         parseInt(item.revert_time) * 1000
                     ).getTime();
-                    var x = setInterval(function () {
+                    let update_timer = function () {
                         var now = new Date().getTime();
                         var distance = countDownDate - now;
                         var minutes = Math.floor(
@@ -149,7 +149,9 @@ function get_docker_status(container) {
                                         '<small style="color:white;"><i class="fas fa-redo"></i> Stop</small></a>'
                                 );
                         }
-                    }, 1000);
+                    };
+                    update_timer();
+                    var x = setInterval(update_timer, 1000);
 
                     return false; // Stop once the correct container is found
                 }
