@@ -410,7 +410,7 @@ def create_container(docker, image, team, portbl):
     URL_TEMPLATE = '%s://%s' % (prefix, host)
     needed_ports = get_required_ports(docker, image)
     team = hashlib.md5(team.encode("utf-8")).hexdigest()[:10]
-    container_name = "%s_%s" % (image.split(':')[0], team)
+    container_name = "%s_%s" % (image.replace('/', '_').replace(':', '_'), team)
     assigned_ports = dict()
     for i in needed_ports:
         while True:
@@ -426,28 +426,26 @@ def create_container(docker, image, team, portbl):
         bindings[i] = [{"HostPort": tmp_ports.pop()}]
     headers = {'Content-Type': "application/json"}
     data = json.dumps({"Image": image, "ExposedPorts": ports, "HostConfig": {"PortBindings": bindings}})
+
     if tls:
         cert, verify = get_client_cert(docker)
         assert cert, "no docker cert!"
         r = requests.post(url="%s/containers/create?name=%s" % (URL_TEMPLATE, container_name), cert=cert,
                           verify=verify, data=data, headers=headers)
         result = r.json()
-        print('result:', result)
         s = requests.post(url="%s/containers/%s/start" % (URL_TEMPLATE, result['Id']), cert=cert, verify=verify,
                           headers=headers)
-        # Clean up the cert files:
+
+        # Clean up the cert files
         for file_path in [*cert, verify]:
             if file_path:
                 Path(file_path).unlink(missing_ok=True)
-
     else:
         r = requests.post(url="%s/containers/create?name=%s" % (URL_TEMPLATE, container_name),
                           data=data, headers=headers)
-        print(r.request.method, r.request.url, r.request.body)
         result = r.json()
-        print(result)
-        # name conflicts are not handled properly
         s = requests.post(url="%s/containers/%s/start" % (URL_TEMPLATE, result['Id']), headers=headers)
+
     return result, data
 
 
@@ -742,7 +740,8 @@ class ContainerAPI(Resource):
         )
         db.session.add(entry)
         db.session.commit()
-        return
+
+        return {'revert_seconds': revert_seconds}
 
 
 active_docker_namespace = Namespace("docker", description='Endpoint to retrieve User Docker Image Status')

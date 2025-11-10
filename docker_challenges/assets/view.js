@@ -242,12 +242,12 @@ function start_container(container) {
         .then(function (response) {
             return response.json().then(function (json) {
                 if (response.ok) {
+                    const revert_seconds = json.revert_seconds;
                     get_docker_status(container);
 
                     updateWarningModal({
                         title: "Attention!",
-                        warningText:
-                            "A Docker container is started for you.<br>Note that you can only revert or stop a container once per 3 minutes!",
+                        warningText: `A Docker container is started for you.<br>Note that you can only revert or stop a container once per ${revert_seconds} seconds!`,
                         buttonText: "Got it!",
                     });
                 } else {
