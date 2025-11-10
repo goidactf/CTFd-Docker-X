@@ -135,6 +135,7 @@ def define_docker_settings(app):
         errors = []
         form = DockerSettingsForm()
         settings = DockerSettings.query.first()
+
         if not settings:
             settings = DockerSettings()
             db.session.add(settings)
@@ -147,13 +148,16 @@ def define_docker_settings(app):
             return render_template("docker_settings.html", form=form, settings=settings, errors=errors)
 
         try:
-            if not form.validate_on_submit():
+            form.process(request.form)
+
+            if not form.validate():
                 if form.errors:
                     for fld, msgs in form.errors.items():
                         for m in msgs:
                             errors.append(f"{fld}: {m}")
                 else:
-                    errors.append("Invalid form submission (possible expired session or invalid CSRF token). Please reload the page and try again.")
+                    errors.append("Invalid form submission (expired session or invalid CSRF token). Please reload the page and try again.")
+
                 try:
                     form.revert_seconds.data = int(request.form.get("revert_seconds", settings.revert_seconds))
                 except Exception:
@@ -176,6 +180,7 @@ def define_docker_settings(app):
             db.session.commit()
 
             return redirect(url_for("admin_docker_settings.docker_settings"))
+
         except Exception:
             traceback.print_exc()
             errors.append("Unexpected error when saving settings. See server logs.")
@@ -355,7 +360,7 @@ def get_client_cert(docker):
     except:
         traceback.print_exc()
         CERT = None
-    return CERT, ca_file.name
+    return CERT, ca_file.name  # type: ignore
 
 
 # For the Docker Config Page. Gets the Current Repositories available on the Docker Server.
