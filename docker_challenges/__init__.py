@@ -272,7 +272,6 @@ def define_docker_status(app):
     @admin_docker_status.route("/admin/docker_status", methods=["GET", "POST"])
     @admins_only
     def docker_admin():
-        docker_config = DockerConfig.query.filter_by(id=1).first()
         docker_tracker = DockerChallengeTracker.query.all()
         for i in docker_tracker:
             if is_teams_mode():
@@ -281,7 +280,7 @@ def define_docker_status(app):
             else:
                 name = Users.query.filter_by(id=i.user_id).first()
                 i.user_id = name.name
-        return render_template("admin_docker_status.html", dockers=docker_tracker)
+        return render_template("docker_status.html", dockers=docker_tracker)
 
     app.register_blueprint(admin_docker_status)
 

@@ -73,29 +73,6 @@ function get_docker_status(container) {
                             .replace(/port|\b\d{5}\b/gi, ports[0].split("/")[0])
                     );
 
-                    // Check if there are links in there, if not and we use a http[s] address, make it a link
-                    CTFd.lib.$(".challenge-connection-info").each(function () {
-                        const $span = CTFd.lib.$(this);
-                        const html = $span.html();
-
-                        // Skip if already has a link
-                        if (html.includes("<a")) {
-                            return;
-                        }
-
-                        // If it contains "http", try to extract and wrap it
-                        const urlMatch = html.match(/(http[s]?:\/\/[^\s<]+)/);
-
-                        if (urlMatch) {
-                            const url = urlMatch[0];
-                            const linked = html.replace(
-                                url,
-                                `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
-                            );
-                            $span.html(linked);
-                        }
-                    });
-
                     // Set up the countdown timer
                     var countDownDate = new Date(
                         parseInt(item.revert_time) * 1000
