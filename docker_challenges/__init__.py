@@ -1,53 +1,82 @@
-import traceback
-
-from CTFd.plugins.challenges import BaseChallenge, CHALLENGE_CLASSES, get_chal_class
-from CTFd.plugins.flags import get_flag_class
-from CTFd.utils.user import get_ip
-from CTFd.utils.uploads import delete_file
-from CTFd.plugins import register_plugin_assets_directory, bypass_csrf_protection
-from CTFd.schemas.tags import TagSchema
-from CTFd.models import db, ma, Challenges, Teams, Users, Solves, Fails, Flags, Files, Hints, Tags, ChallengeFiles
-from CTFd.utils.decorators import admins_only, authed_only, during_ctf_time_only, require_verified_emails
-from CTFd.utils.decorators.visibility import check_challenge_visibility, check_score_visibility
-from CTFd.utils.user import get_current_team
-from CTFd.utils.user import get_current_user
-from CTFd.utils.user import is_admin, authed
-from CTFd.utils.config import is_teams_mode
-from CTFd.api import CTFd_API_v1
-from CTFd.api.v1.scoreboard import ScoreboardDetail
-import CTFd.utils.scores
-from CTFd.api.v1.challenges import ChallengeList, Challenge
-from flask_restx import Namespace, Resource
-from flask import request, Blueprint, jsonify, abort, render_template, url_for, redirect, session
-# from flask_wtf import FlaskForm
-from wtforms import (
-    FileField,
-    HiddenField,
-    PasswordField,
-    RadioField,
-    SelectField,
-    StringField,
-    TextAreaField,
-    SelectMultipleField,
-    BooleanField,
-)
-# from wtforms import TextField, SubmitField, BooleanField, HiddenField, FileField, SelectMultipleField
-from wtforms.validators import DataRequired, ValidationError, InputRequired
-from werkzeug.utils import secure_filename
+import json
+import random
+import hashlib
 import requests
 import tempfile
-from CTFd.utils.dates import unix_time
+import traceback
+
+from pathlib import Path
 from datetime import datetime
-import json
-import hashlib
-import random
-from CTFd.plugins import register_admin_plugin_menu_bar
+
+from flask import request, Blueprint, abort, render_template, redirect, url_for
+
+from flask_restx import Namespace, Resource
+
+from wtforms.validators import NumberRange, InputRequired
+from wtforms import IntegerField
+from wtforms import (
+    FileField,
+    IntegerField,
+    HiddenField,
+    RadioField,
+    StringField,
+    SelectMultipleField,
+)
+
+import CTFd.utils.scores
+
+from CTFd.models import db, Challenges, Teams, Users, Solves, Fails, Flags, Hints, Tags, ChallengeFiles
+
+from CTFd.api import CTFd_API_v1
 
 from CTFd.forms import BaseForm
 from CTFd.forms.fields import SubmitField
-from CTFd.utils.config import get_themes
 
-from pathlib import Path
+from CTFd.plugins import register_plugin_assets_directory
+from CTFd.plugins.flags import get_flag_class
+from CTFd.plugins.challenges import BaseChallenge, CHALLENGE_CLASSES
+
+from CTFd.utils.user import get_ip
+from CTFd.utils.user import get_current_team
+from CTFd.utils.user import get_current_user
+from CTFd.utils.dates import unix_time
+from CTFd.utils.config import is_teams_mode
+from CTFd.utils.uploads import delete_file
+from CTFd.utils.decorators import admins_only, authed_only
+
+
+class DockerSettings(db.Model):
+    """
+    Docker runtime settings stored in DB.
+    Controls revert window, max concurrent containers, and cleanup threshold.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    revert_seconds = db.Column(db.Integer, default=180, index=True)   # seconds until revert allowed
+    max_containers = db.Column(db.Integer, default=1, index=True)     # max running containers per user/team
+    cleanup_seconds = db.Column(db.Integer, default=7200, index=True)  # delete containers older than this
+
+
+class DockerSettingsForm(BaseForm):
+    id = HiddenField()
+    revert_seconds = IntegerField(
+        "Revert window (seconds)",
+        description="Number of seconds a user must wait before they can revert/stop a container (default 180).",
+        validators=[InputRequired(), NumberRange(min=1)],
+        default=180
+    )
+    max_containers = IntegerField(
+        "Max running containers per user/team",
+        description="Maximum concurrent running docker containers per user or team (default 1).",
+        validators=[InputRequired(), NumberRange(min=1)],
+        default=1
+    )
+    cleanup_seconds = IntegerField(
+        "Cleanup threshold (seconds)",
+        description="Delete containers older than this many seconds (default 7200).",
+        validators=[InputRequired(), NumberRange(min=60)],
+        default=7200
+    )
+    submit = SubmitField("Save")
 
 
 class DockerConfig(db.Model):
@@ -90,6 +119,52 @@ class DockerConfigForm(BaseForm):
     client_key = FileField('Client Key')
     repositories = SelectMultipleField('Repositories')
     submit = SubmitField('Submit')
+
+
+def define_docker_settings(app):
+    admin_docker_settings = Blueprint(
+        'admin_docker_settings',
+        __name__,
+        template_folder='templates',
+        static_folder='assets'
+    )
+
+    @admin_docker_settings.route("/admin/docker_settings", methods=["GET", "POST"])
+    @admins_only
+    def docker_settings():
+        errors = []
+        form = DockerSettingsForm(request.form)
+        settings = DockerSettings.query.first()
+
+        if not settings:
+            settings = DockerSettings()
+            db.session.add(settings)
+            db.session.commit()
+
+        if request.method == "POST":
+            try:
+                if form.validate_on_submit():
+                    settings.revert_seconds = int(request.form.get("revert_seconds"))  # type: ignore
+                    settings.max_containers = int(request.form.get("max_containers"))  # type: ignore
+                    settings.cleanup_seconds = int(request.form.get("cleanup_seconds"))  # type: ignore
+                    db.session.add(settings)
+                    db.session.commit()
+                    return redirect(url_for('admin_docker_settings.docker_settings'))
+                else:
+                    for field, messages in form.errors.items():
+                        for m in messages:
+                            errors.append(f"{field}: {m}")
+            except Exception:
+                traceback.print_exc()
+                errors.append("Failed to save settings. See server logs.")
+
+        form.revert_seconds.data = settings.revert_seconds
+        form.max_containers.data = settings.max_containers
+        form.cleanup_seconds.data = settings.cleanup_seconds
+
+        return render_template("docker_settings.html", form=form, settings=settings, errors=errors)
+
+    app.register_blueprint(admin_docker_settings)
 
 
 def define_docker_admin(app):
@@ -216,14 +291,16 @@ class KillContainerAPI(Resource):
         return True
 
 
-def do_request(docker, url, headers=None, method='GET'):
+def do_request(docker, url, headers=None, method='GET') -> requests.Response | None:
     tls = docker.tls_enabled
     prefix = 'https' if tls else 'http'
     host = docker.hostname
     URL_TEMPLATE = '%s://%s' % (prefix, host)
+    r = None
     try:
         if tls:
             cert, verify = get_client_cert(docker)
+            assert cert, "no docker cert!"
             if (method == 'GET'):
                 r = requests.get(url=f"%s{url}" % URL_TEMPLATE, cert=cert, verify=verify, headers=headers)
             elif (method == 'DELETE'):
@@ -239,7 +316,6 @@ def do_request(docker, url, headers=None, method='GET'):
                 r = requests.delete(url=f"%s{url}" % URL_TEMPLATE, headers=headers)
     except:
         traceback.print_exc()
-        r = []
     return r
 
 
@@ -268,6 +344,7 @@ def get_client_cert(docker):
 # For the Docker Config Page. Gets the Current Repositories available on the Docker Server.
 def get_repositories(docker, tags=False, repos=False):
     r = do_request(docker, '/images/json?all=1')
+    assert r, "can't get repositories"
     result = list()
     for i in r.json():
         if not i['RepoTags'] == []:
@@ -284,6 +361,7 @@ def get_repositories(docker, tags=False, repos=False):
 
 def get_unavailable_ports(docker):
     r = do_request(docker, '/containers/json?all=1')
+    assert r, "can't get containers"
     result = list()
     for i in r.json():
         if not i['Ports'] == []:
@@ -294,6 +372,7 @@ def get_unavailable_ports(docker):
 
 def get_required_ports(docker, image):
     r = do_request(docker, f'/images/{image}/json?all=1')
+    assert r, "can't get image ports"
     result = r.json()['Config']['ExposedPorts'].keys()
     return result
 
@@ -327,6 +406,7 @@ def create_container(docker, image, team, portbl):
     data = json.dumps({"Image": image, "ExposedPorts": ports, "HostConfig": {"PortBindings": bindings}})
     if tls:
         cert, verify = get_client_cert(docker)
+        assert cert, "no docker cert!"
         r = requests.post(url="%s/containers/create?name=%s" % (URL_TEMPLATE, container_name), cert=cert,
                           verify=verify, data=data, headers=headers)
         result = r.json()

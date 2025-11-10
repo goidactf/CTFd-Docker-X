@@ -4,6 +4,10 @@
 		"route": "/admin/docker_config"
 	},
 	{
+		"name": "Docker Settings",
+		"route": "/admin/docker_settings"
+	},
+	{
 		"name": "Docker Status",
 		"route": "/admin/docker_status"
 	}
