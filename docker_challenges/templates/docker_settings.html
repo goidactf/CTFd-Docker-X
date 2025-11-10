@@ -1,9 +1,11 @@
-{% extends 'admin/base.html' %}
-{% block content %}
+{% extends 'admin/base.html' %} {% block content %}
 <div class="jumbotron">
     <div class="container">
         <h1>Docker Runtime Settings</h1>
-        <p class="lead">Change container timing and concurrency settings used by the docker plugin.</p>
+        <p class="lead">
+            Change container timing and concurrency settings used by the docker
+            plugin.
+        </p>
     </div>
 </div>
 
@@ -11,33 +13,77 @@
     <div class="row">
         <div class="col-md-6 offset-md-3">
             {% for error in errors %}
-            <div class="alert alert-danger" role="alert">
-                {{ error }}
-            </div>
+            <div class="alert alert-danger" role="alert">{{ error }}</div>
             {% endfor %}
 
-            <form method="post" accept-charset="utf-8" autocomplete="off" role="form" name="docker_settings_form" class="form-horizontal">
+            <form
+                method="post"
+                accept-charset="utf-8"
+                autocomplete="off"
+                role="form"
+                name="docker_settings_form"
+                class="form-horizontal"
+            >
                 <div class="form-group">
-                    <label for="revert_seconds">Revert cooldown (seconds)</label>
-                    <input class="form-control" type="number" name="revert_seconds" id="revert_seconds" min="1" value="{{ form.revert_seconds.data or settings.revert_seconds }}" required />
-                    <small class="form-text text-muted">{{ form.revert_seconds.description }}</small>
+                    <label for="revert_seconds"
+                        >Revert cooldown (seconds)</label
+                    >
+                    <input
+                        class="form-control"
+                        type="number"
+                        name="revert_seconds"
+                        id="revert_seconds"
+                        min="1"
+                        value="{{ form.revert_seconds.data or settings.revert_seconds }}"
+                        required
+                    />
+                    <small class="form-text text-muted"
+                        >{{ form.revert_seconds.description }}</small
+                    >
                 </div>
 
                 <div class="form-group">
-                    <label for="max_containers">Max running containers per user/team</label>
-                    <input class="form-control" type="number" name="max_containers" id="max_containers" min="1" value="{{ form.max_containers.data or settings.max_containers }}" required />
-                    <small class="form-text text-muted">{{ form.max_containers.description }}</small>
+                    <label for="max_containers"
+                        >Max running containers per user/team</label
+                    >
+                    <input
+                        class="form-control"
+                        type="number"
+                        name="max_containers"
+                        id="max_containers"
+                        min="1"
+                        value="{{ form.max_containers.data or settings.max_containers }}"
+                        required
+                    />
+                    <small class="form-text text-muted"
+                        >{{ form.max_containers.description }}</small
+                    >
                 </div>
 
                 <div class="form-group">
-                    <label for="cleanup_seconds">Cleanup threshold (seconds)</label>
-                    <input class="form-control" type="number" name="cleanup_seconds" id="cleanup_seconds" min="60" value="{{ form.cleanup_seconds.data or settings.cleanup_seconds }}" required />
-                    <small class="form-text text-muted">{{ form.cleanup_seconds.description }}</small>
+                    <label for="cleanup_seconds"
+                        >Cleanup threshold (seconds)</label
+                    >
+                    <input
+                        class="form-control"
+                        type="number"
+                        name="cleanup_seconds"
+                        id="cleanup_seconds"
+                        min="60"
+                        value="{{ form.cleanup_seconds.data or settings.cleanup_seconds }}"
+                        required
+                    />
+                    <small class="form-text text-muted"
+                        >{{ form.cleanup_seconds.description }}</small
+                    >
                 </div>
 
-                {{ form.csrf_token }}
+                {{ form.nonce() }}
+
                 <div class="text-center">
-                    <button type="submit" class="btn btn-md btn-primary">Save Settings</button>
+                    <button type="submit" class="btn btn-md btn-primary">
+                        Save Settings
+                    </button>
                 </div>
             </form>
         </div>

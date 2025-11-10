@@ -133,36 +133,53 @@ def define_docker_settings(app):
     @admins_only
     def docker_settings():
         errors = []
-        form = DockerSettingsForm(request.form)
+        form = DockerSettingsForm()
         settings = DockerSettings.query.first()
-
         if not settings:
             settings = DockerSettings()
             db.session.add(settings)
             db.session.commit()
 
-        if request.method == "POST":
-            try:
-                if form.validate_on_submit():
-                    settings.revert_seconds = int(request.form.get("revert_seconds"))  # type: ignore
-                    settings.max_containers = int(request.form.get("max_containers"))  # type: ignore
-                    settings.cleanup_seconds = int(request.form.get("cleanup_seconds"))  # type: ignore
-                    db.session.add(settings)
-                    db.session.commit()
-                    return redirect(url_for('admin_docker_settings.docker_settings'))
+        if request.method == "GET":
+            form.revert_seconds.data = settings.revert_seconds
+            form.max_containers.data = settings.max_containers
+            form.cleanup_seconds.data = settings.cleanup_seconds
+            return render_template("docker_settings.html", form=form, settings=settings, errors=errors)
+
+        try:
+            if not form.validate_on_submit():
+                if form.errors:
+                    for fld, msgs in form.errors.items():
+                        for m in msgs:
+                            errors.append(f"{fld}: {m}")
                 else:
-                    for field, messages in form.errors.items():
-                        for m in messages:
-                            errors.append(f"{field}: {m}")
-            except Exception:
-                traceback.print_exc()
-                errors.append("Failed to save settings. See server logs.")
+                    errors.append("Invalid form submission (possible expired session or invalid CSRF token). Please reload the page and try again.")
+                try:
+                    form.revert_seconds.data = int(request.form.get("revert_seconds", settings.revert_seconds))
+                except Exception:
+                    pass
+                try:
+                    form.max_containers.data = int(request.form.get("max_containers", settings.max_containers))
+                except Exception:
+                    pass
+                try:
+                    form.cleanup_seconds.data = int(request.form.get("cleanup_seconds", settings.cleanup_seconds))
+                except Exception:
+                    pass
 
-        form.revert_seconds.data = settings.revert_seconds
-        form.max_containers.data = settings.max_containers
-        form.cleanup_seconds.data = settings.cleanup_seconds
+                return render_template("docker_settings.html", form=form, settings=settings, errors=errors), 400
 
-        return render_template("docker_settings.html", form=form, settings=settings, errors=errors)
+            settings.revert_seconds = int(form.revert_seconds.data)  # type: ignore
+            settings.max_containers = int(form.max_containers.data)  # type: ignore
+            settings.cleanup_seconds = int(form.cleanup_seconds.data)  # type: ignore
+            db.session.add(settings)
+            db.session.commit()
+
+            return redirect(url_for("admin_docker_settings.docker_settings"))
+        except Exception:
+            traceback.print_exc()
+            errors.append("Unexpected error when saving settings. See server logs.")
+            return render_template("docker_settings.html", form=form, settings=settings, errors=errors), 500
 
     app.register_blueprint(admin_docker_settings)
 
