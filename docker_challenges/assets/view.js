@@ -52,6 +52,7 @@ function get_docker_status(container) {
                             port +
                             ` <a href='http://${item.host}:${port_no_proto}/' target="_blank" rel="noopener noreferrer">${link_svg}</a><br />`; // todo: skip non-tcp?
                     });
+
                     // Update the DOM with the docker container information
                     CTFd.lib
                         .$("#docker_container")
@@ -62,16 +63,6 @@ function get_docker_status(container) {
                                 String(item.instance_id).substring(0, 10) +
                                 '_revert_container"></div>'
                         );
-
-                    // Update the DOM with connection info information.
-                    // Note that connection info should contain "host" and "port"
-                    var $link = CTFd.lib.$(".challenge-connection-info");
-                    $link.html($link.html().replace(/host/gi, item.host));
-                    $link.html(
-                        $link
-                            .html()
-                            .replace(/port|\b\d{5}\b/gi, ports[0].split("/")[0])
-                    );
 
                     // Set up the countdown timer
                     var countDownDate = new Date(
