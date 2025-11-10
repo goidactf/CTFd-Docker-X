@@ -1,13 +1,13 @@
 # CTFd Docker Plugin Fork
 
-### Changes
+## Changes
 This a fork of the original docker plugin. Changes that were made:
 - Some UI fixies (dark theme support, links near the spawned docker container's ports, fix delayed appearance of the timer, and other).
 - Allow to configure some more parameters (alive containers per team/user, revert cooldown, cleanup threshold).
 - Some other small bugfixies / improvements.
 
 
-### About
+## About
 This plugin for CTFd will allow your competing teams/users to start dockerized images for presented challenges. It adds a challenge type "docker" that can be assigned a specific docker image/tag. A few notable requirements:
 
 * Docker Config must be set first. You can access this via `/admin/docker_config`. Currently supported config is pure http (no encryption/authentication) or full TLS with client certificate validation. Configuration information for TLS can be found here: https://docs.docker.com/engine/security/https/
