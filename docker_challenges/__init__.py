@@ -410,7 +410,7 @@ def create_container(docker, image, team, portbl):
     URL_TEMPLATE = '%s://%s' % (prefix, host)
     needed_ports = get_required_ports(docker, image)
     team = hashlib.md5(team.encode("utf-8")).hexdigest()[:10]
-    container_name = "%s_%s" % (image.split(':')[1], team)
+    container_name = "%s_%s" % (image.split(':')[0], team)
     assigned_ports = dict()
     for i in needed_ports:
         while True:
@@ -432,6 +432,7 @@ def create_container(docker, image, team, portbl):
         r = requests.post(url="%s/containers/create?name=%s" % (URL_TEMPLATE, container_name), cert=cert,
                           verify=verify, data=data, headers=headers)
         result = r.json()
+        print('result:', result)
         s = requests.post(url="%s/containers/%s/start" % (URL_TEMPLATE, result['Id']), cert=cert, verify=verify,
                           headers=headers)
         # Clean up the cert files:
