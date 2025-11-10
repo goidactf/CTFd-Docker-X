@@ -34,6 +34,7 @@ function get_docker_status(container) {
                 document.getElementsByClassName("fa-moon").length == 1
                     ? black_theme_link
                     : light_theme_link;
+
             result.data.forEach((item) => {
                 if (item.docker_image == container) {
                     // Split the ports and create the data string

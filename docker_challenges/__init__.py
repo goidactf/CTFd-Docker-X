@@ -51,9 +51,9 @@ class DockerSettings(db.Model):
     Controls revert window, max concurrent containers, and cleanup threshold.
     """
     id = db.Column(db.Integer, primary_key=True)
-    revert_seconds = db.Column(db.Integer, default=180, index=True)   # seconds until revert allowed
-    max_containers = db.Column(db.Integer, default=1, index=True)     # max running containers per user/team
-    cleanup_seconds = db.Column(db.Integer, default=7200, index=True)  # delete containers older than this
+    revert_seconds = db.Column(db.Integer, default=180, index=True, nullable=False)   # seconds until revert allowed
+    max_containers = db.Column(db.Integer, default=1, index=True, nullable=False)     # max running containers per user/team
+    cleanup_seconds = db.Column(db.Integer, default=7200, index=True, nullable=False)  # delete containers older than this
 
 
 class DockerSettingsForm(BaseForm):
@@ -636,33 +636,48 @@ class ContainerAPI(Resource):
             return abort(403, "No challenge name specified")
 
         docker = DockerConfig.query.filter_by(id=1).first()
+        settings = DockerSettings.query.first()
+        # ensure settings exist with defaults
+        if not settings:
+            settings = DockerSettings()
+            db.session.add(settings)
+            db.session.commit()
+
         containers = DockerChallengeTracker.query.all()
         if container not in get_repositories(docker, tags=True):
             return abort(403, f"Container {container} not present in the repository.")
+
+        cleanup_seconds = settings.cleanup_seconds
         if is_teams_mode():
             session = get_current_team()
-            # First we'll delete all old docker containers (+2 hours)
             for cont in containers:
-                if int(session.id) == int(cont.team_id) and (unix_time(datetime.utcnow()) - int(cont.timestamp)) >= 7200:
-                    delete_container(docker, cont.instance_id)
-                    DockerChallengeTracker.query.filter_by(instance_id=cont.instance_id).delete()
-                    db.session.commit()
+                try:
+                    if int(session.id) == int(cont.team_id) and (unix_time(datetime.utcnow()) - int(cont.timestamp)) >= int(cleanup_seconds):
+                        delete_container(docker, cont.instance_id)
+                        DockerChallengeTracker.query.filter_by(instance_id=cont.instance_id).delete()
+                        db.session.commit()
+                except Exception:
+                    continue
             check = DockerChallengeTracker.query.filter_by(team_id=session.id).filter_by(docker_image=container).first()
         else:
             session = get_current_user()
             for cont in containers:
-                if int(session.id) == int(cont.user_id) and (unix_time(datetime.utcnow()) - int(cont.timestamp)) >= 7200:
-                    delete_container(docker, cont.instance_id)
-                    DockerChallengeTracker.query.filter_by(instance_id=cont.instance_id).delete()
-                    db.session.commit()
+                try:
+                    if int(session.id) == int(cont.user_id) and (unix_time(datetime.utcnow()) - int(cont.timestamp)) >= int(cleanup_seconds):
+                        delete_container(docker, cont.instance_id)
+                        DockerChallengeTracker.query.filter_by(instance_id=cont.instance_id).delete()
+                        db.session.commit()
+                except Exception:
+                    continue
             check = DockerChallengeTracker.query.filter_by(user_id=session.id).filter_by(docker_image=container).first()
 
-        # If this container is already created, we don't need another one.
-        if check != None and not (unix_time(datetime.utcnow()) - int(check.timestamp)) >= 180:
-            return abort(403, "To prevent abuse, dockers can be reverted and stopped after 3 minutes of creation.")
+        revert_seconds = settings.revert_seconds
+        if check is not None:
+            age = unix_time(datetime.utcnow()) - int(check.timestamp)
+            if age < int(revert_seconds):
+                return abort(403, "To prevent abuse, dockers can be reverted and stopped after %s seconds of creation." % revert_seconds)
 
-        # Delete when requested
-        elif check != None and request.args.get('stopcontainer'):
+        if check is not None and request.args.get('stopcontainer'):
             delete_container(docker, check.instance_id)
             if is_teams_mode():
                 DockerChallengeTracker.query.filter_by(team_id=session.id).filter_by(docker_image=container).delete()
@@ -670,21 +685,23 @@ class ContainerAPI(Resource):
                 DockerChallengeTracker.query.filter_by(user_id=session.id).filter_by(docker_image=container).delete()
             db.session.commit()
             return {"result": "Container stopped"}
-        # The exception would be if we are reverting a box. So we'll delete it if it exists and has been around for more than 3 minutes.
 
-        elif check != None:
-            delete_container(docker, check.instance_id)
-            if is_teams_mode():
-                DockerChallengeTracker.query.filter_by(team_id=session.id).filter_by(docker_image=container).delete()
-            else:
-                DockerChallengeTracker.query.filter_by(user_id=session.id).filter_by(docker_image=container).delete()
-            db.session.commit()
-
-        # Check if a container is already running for this user. We need to recheck the DB first
         containers = DockerChallengeTracker.query.all()
+        running_count = 0
         for cont in containers:
-            if int(session.id) == int(cont.user_id):
-                return abort(403, f"Another container is already running for challenge:<br><i><b>{cont.challenge}</b></i>.<br>Please stop this first.<br>You can only run one container.")
+            try:
+                if is_teams_mode():
+                    if int(session.id) == int(cont.team_id):
+                        running_count += 1
+                else:
+                    if int(session.id) == int(cont.user_id):
+                        running_count += 1
+            except Exception:
+                continue
+
+        max_containers = settings.max_containers
+        if running_count >= int(max_containers):
+            return abort(403, f"Max running containers reached ({running_count}/{max_containers}). Stop an existing container first.")
 
         portsbl = get_unavailable_ports(docker)
         create = create_container(docker, container, session.name, portsbl)
@@ -694,7 +711,7 @@ class ContainerAPI(Resource):
             user_id=session.id if not is_teams_mode() else None,
             docker_image=container,
             timestamp=unix_time(datetime.utcnow()),
-            revert_time=unix_time(datetime.utcnow()) + 180,
+            revert_time=unix_time(datetime.utcnow()) + int(revert_seconds),
             instance_id=create[0]['Id'],
             ports=','.join([p[0]['HostPort'] for p in ports]),
             host=str(docker.hostname).split(':')[0],
@@ -702,7 +719,6 @@ class ContainerAPI(Resource):
         )
         db.session.add(entry)
         db.session.commit()
-        # db.session.close()
         return
 
 
@@ -784,9 +800,13 @@ def load(app):
     @app.template_filter('datetimeformat')
     def datetimeformat(value, format='%Y-%m-%d %H:%M:%S'):
         return datetime.fromtimestamp(value).strftime(format)
+
     register_plugin_assets_directory(app, base_path='/plugins/docker_challenges/assets')
+
     define_docker_admin(app)
     define_docker_status(app)
+    define_docker_settings(app)
+
     CTFd_API_v1.add_namespace(docker_namespace, '/docker')
     CTFd_API_v1.add_namespace(container_namespace, '/container')
     CTFd_API_v1.add_namespace(active_docker_namespace, '/docker_status')
