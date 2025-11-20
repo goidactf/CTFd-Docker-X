@@ -706,6 +706,16 @@ class ContainerAPI(Resource):
             db.session.commit()
             return {"result": "Container stopped"}
 
+        # for restart...
+        elif check is not None:
+            delete_container(docker, check.instance_id)
+            if is_teams_mode():
+                DockerChallengeTracker.query.filter_by(team_id=session.id).filter_by(docker_image=container).delete()
+            else:
+                DockerChallengeTracker.query.filter_by(user_id=session.id).filter_by(docker_image=container).delete()
+            db.session.commit()
+            # do not return, creating new container
+
         containers = DockerChallengeTracker.query.all()
         running_count = 0
         for cont in containers:

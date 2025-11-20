@@ -111,7 +111,7 @@ function get_docker_status(container) {
                                     "<a onclick=\"start_container('" +
                                         item.docker_image +
                                         '\');" class="btn btn-dark">' +
-                                        '<small style="color:white;"><i class="fas fa-redo"></i> Revert</small></a> ' +
+                                        '<small style="color:white;"><i class="fas fa-redo"></i> Restart</small></a> ' +
                                         "<a onclick=\"stop_container('" +
                                         item.docker_image +
                                         '\');" class="btn btn-dark">' +
