@@ -89,7 +89,7 @@ function get_docker_status(container) {
                                     "_revert_container"
                             )
                             .html(
-                                "Stop or Revert Available in " +
+                                "Stop or Restart Available in " +
                                     minutes +
                                     ":" +
                                     seconds
@@ -215,7 +215,7 @@ function start_container(container) {
 
                     updateWarningModal({
                         title: "Attention!",
-                        warningText: `A Docker container is started for you.<br>Note that you can only revert or stop a container once per ${revert_seconds} seconds!`,
+                        warningText: `A Docker container is started for you.<br>Note that you can only restart or stop a container once per ${revert_seconds} seconds!`,
                         buttonText: "Got it!",
                     });
                 } else {
@@ -284,7 +284,7 @@ function updateWarningModal({ title, warningText, buttonText, onClose } = {}) {
     CTFd.lib.$("#warningOkBtn").on("click", closeModal);
 }
 
-// In order to capture the flag submission, and remove the "Revert" and "Stop" buttons after solving a challenge
+// In order to capture the flag submission, and remove the "Restart" and "Stop" buttons after solving a challenge
 // We need to hook that call, and do this manually.
 function checkForCorrectFlag() {
     const challengeWindow = document.querySelector("#challenge-window");
