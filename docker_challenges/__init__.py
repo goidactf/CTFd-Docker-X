@@ -642,6 +642,7 @@ class DockerChallenge(Challenges):
     id = db.Column(None, db.ForeignKey('challenges.id'), primary_key=True)
     docker_image = db.Column(db.String(128), index=True)
 
+
 class DockerDynamicChallenge(Challenges):
     __mapper_args__ = {'polymorphic_identity': 'docker_dynamic'}
     id = db.Column(None, db.ForeignKey('challenges.id', ondelete='CASCADE'), primary_key=True)
@@ -690,6 +691,7 @@ class DockerDynamicChallenge(Challenges):
             self.value = kwargs["initial"]
         except KeyError:
             raise ChallengeCreateException("Missing initial value for challenge")
+
 
 class DockerDynamicChallengeType(BaseChallenge):
     id = "docker_dynamic"
