@@ -44,6 +44,9 @@ from CTFd.utils.config import is_teams_mode
 from CTFd.utils.uploads import delete_file
 from CTFd.utils.decorators import admins_only, authed_only
 
+from CTFd.exceptions.challenges import ChallengeCreateException, ChallengeUpdateException
+from CTFd.plugins.dynamic_challenges.decay import DECAY_FUNCTIONS, logarithmic
+
 
 class DockerSettings(db.Model):
     """
@@ -639,6 +642,195 @@ class DockerChallenge(Challenges):
     id = db.Column(None, db.ForeignKey('challenges.id'), primary_key=True)
     docker_image = db.Column(db.String(128), index=True)
 
+class DockerDynamicChallenge(Challenges):
+    __mapper_args__ = {'polymorphic_identity': 'docker_dynamic'}
+    id = db.Column(None, db.ForeignKey('challenges.id', ondelete='CASCADE'), primary_key=True)
+    docker_image = db.Column(db.String(128))
+
+    dynamic_initial = db.Column(db.Integer, default=0)
+    dynamic_minimum = db.Column(db.Integer, default=0)
+    dynamic_decay = db.Column(db.Integer, default=0)
+    dynamic_function = db.Column(db.String(32), default="logarithmic")
+
+    @property
+    def initial(self):
+        return self.dynamic_initial
+
+    @initial.setter
+    def initial(self, initial_value):
+        self.dynamic_initial = initial_value
+
+    @property
+    def minimum(self):
+        return self.dynamic_minimum
+
+    @minimum.setter
+    def minimum(self, minimum_value):
+        self.dynamic_minimum = minimum_value
+
+    @property
+    def decay(self):
+        return self.dynamic_decay
+
+    @decay.setter
+    def decay(self, decay_value):
+        self.dynamic_decay = decay_value
+
+    @property
+    def function(self):
+        return self.dynamic_function
+
+    @function.setter
+    def function(self, function_value):
+        self.dynamic_function = function_value
+
+    def __init__(self, *args, **kwargs):
+        super(DockerDynamicChallenge, self).__init__(**kwargs)
+        try:
+            self.value = kwargs["initial"]
+        except KeyError:
+            raise ChallengeCreateException("Missing initial value for challenge")
+
+class DockerDynamicChallengeType(BaseChallenge):
+    id = "docker_dynamic"
+    name = "docker_dynamic"
+    templates = {
+        'create': '/plugins/docker_challenges/assets/docker_dynamic_create.html',
+        'update': '/plugins/docker_challenges/assets/docker_dynamic_update.html',
+        'view': '/plugins/docker_challenges/assets/view.html',
+    }
+    scripts = {
+        'create': '/plugins/docker_challenges/assets/docker_dynamic_create.js',
+        'update': '/plugins/docker_challenges/assets/docker_dynamic_update.js',
+        'view': '/plugins/docker_challenges/assets/view.js',
+    }
+    route = '/plugins/docker_challenges/assets'
+    blueprint = Blueprint('docker_dynamic_challenges', __name__, template_folder='templates', static_folder='assets')
+
+    @classmethod
+    def calculate_value(cls, challenge):
+        f = DECAY_FUNCTIONS.get(challenge.function, logarithmic)
+        value = f(challenge)
+
+        challenge.value = value
+        db.session.commit()
+        return challenge
+
+    @staticmethod
+    def update(challenge, request):
+        data = request.form or request.get_json()
+        for attr, value in data.items():
+            if attr in ("initial", "minimum", "decay"):
+                try:
+                    value = float(value)
+                except (ValueError, TypeError):
+                    raise ChallengeUpdateException(f"Invalid input for '{attr}'")
+            setattr(challenge, attr, value)
+
+        db.session.commit()
+        DockerDynamicChallengeType.calculate_value(challenge)
+        return challenge
+
+    @staticmethod
+    def delete(challenge):
+        Fails.query.filter_by(challenge_id=challenge.id).delete()
+        Solves.query.filter_by(challenge_id=challenge.id).delete()
+        Flags.query.filter_by(challenge_id=challenge.id).delete()
+        files = ChallengeFiles.query.filter_by(challenge_id=challenge.id).all()
+        for f in files:
+            delete_file(f.id)
+        ChallengeFiles.query.filter_by(challenge_id=challenge.id).delete()
+        Tags.query.filter_by(challenge_id=challenge.id).delete()
+        Hints.query.filter_by(challenge_id=challenge.id).delete()
+        DockerDynamicChallenge.query.filter_by(id=challenge.id).delete()
+        Challenges.query.filter_by(id=challenge.id).delete()
+        db.session.commit()
+
+    @staticmethod
+    def read(challenge):
+        challenge = DockerDynamicChallenge.query.filter_by(id=challenge.id).first()
+        data = {
+            'id': challenge.id,
+            'name': challenge.name,
+            'value': challenge.value,
+            'docker_image': challenge.docker_image,
+            'initial': challenge.initial,
+            'decay': challenge.decay,
+            'minimum': challenge.minimum,
+            'function': challenge.function,
+            'description': challenge.description,
+            'category': challenge.category,
+            'state': challenge.state,
+            'max_attempts': challenge.max_attempts,
+            'type': challenge.type,
+            'type_data': {
+                'id': DockerDynamicChallengeType.id,
+                'name': DockerDynamicChallengeType.name,
+                'templates': DockerDynamicChallengeType.templates,
+                'scripts': DockerDynamicChallengeType.scripts,
+            }
+        }
+        return data
+
+    @staticmethod
+    def create(request):
+        data = request.form or request.get_json()
+        challenge = DockerDynamicChallenge(**data)
+        db.session.add(challenge)
+        db.session.commit()
+        return challenge
+
+    @staticmethod
+    def attempt(challenge, request):
+        data = request.form or request.get_json()
+        submission = data["submission"].strip()
+        flags = Flags.query.filter_by(challenge_id=challenge.id).all()
+        for flag in flags:
+            if get_flag_class(flag.type).compare(flag, submission):
+                return True, "Correct"
+        return False, "Incorrect"
+
+    @staticmethod
+    def solve(user, team, challenge, request):
+        data = request.form or request.get_json()
+        submission = data["submission"].strip()
+        docker = DockerConfig.query.filter_by(id=1).first()
+        try:
+            if is_teams_mode():
+                docker_containers = DockerChallengeTracker.query.filter_by(
+                    docker_image=challenge.docker_image).filter_by(team_id=team.id).first()
+            else:
+                docker_containers = DockerChallengeTracker.query.filter_by(
+                    docker_image=challenge.docker_image).filter_by(user_id=user.id).first()
+            delete_container(docker, docker_containers.instance_id)
+            DockerChallengeTracker.query.filter_by(instance_id=docker_containers.instance_id).delete()
+        except:
+            pass
+        solve = Solves(
+            user_id=user.id,
+            team_id=team.id if team else None,
+            challenge_id=challenge.id,
+            ip=get_ip(req=request),
+            provided=submission,
+        )
+        db.session.add(solve)
+        db.session.commit()
+        DockerDynamicChallengeType.calculate_value(challenge)
+
+    @staticmethod
+    def fail(user, team, challenge, request):
+        data = request.form or request.get_json()
+        submission = data["submission"].strip()
+        wrong = Fails(
+            user_id=user.id,
+            team_id=team.id if team else None,
+            challenge_id=challenge.id,
+            ip=get_ip(request),
+            provided=submission,
+        )
+        db.session.add(wrong)
+        db.session.commit()
+
 
 # API
 container_namespace = Namespace("container", description='Endpoint to interact with containers')
@@ -828,6 +1020,7 @@ class DockerAPI(Resource):
 def load(app):
     app.db.create_all()
     CHALLENGE_CLASSES['docker'] = DockerChallengeType
+    CHALLENGE_CLASSES['docker_dynamic'] = DockerDynamicChallengeType
 
     @app.template_filter('datetimeformat')
     def datetimeformat(value, format='%Y-%m-%d %H:%M:%S'):
