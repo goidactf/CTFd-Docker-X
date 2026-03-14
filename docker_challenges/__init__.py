@@ -276,14 +276,28 @@ def define_docker_status(app):
     @admins_only
     def docker_admin():
         docker_tracker = DockerChallengeTracker.query.all()
+        dockers = []
         for i in docker_tracker:
+            d = {
+                "id": i.id,
+                "team_id": i.team_id,
+                "user_id": i.user_id,
+                "docker_image": i.docker_image,
+                "timestamp": i.timestamp,
+                "revert_time": i.revert_time,
+                "instance_id": i.instance_id,
+                "ports": i.ports,
+                "host": i.host,
+                "challenge": i.challenge
+            }
             if is_teams_mode():
                 name = Teams.query.filter_by(id=i.team_id).first()
-                i.team_id = name.name
+                d["team_id"] = name.name if name else "Team not found"
             else:
                 name = Users.query.filter_by(id=i.user_id).first()
-                i.user_id = name.name
-        return render_template("docker_status.html", dockers=docker_tracker)
+                d["user_id"] = name.name if name else "User not found"
+            dockers.append(d)
+        return render_template("docker_status.html", dockers=dockers)
 
     app.register_blueprint(admin_docker_status)
 
