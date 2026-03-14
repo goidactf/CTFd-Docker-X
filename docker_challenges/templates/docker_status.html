@@ -80,16 +80,16 @@
                         {% if docker.team_id %}
                         <td
                             class="text-left"
-                            value="{{docker.team_id | safe }}"
+                            value="{{ docker.team_id }}"
                         >
-                            {{docker.team_id | safe }}
+                            {{ docker.team_id }}
                         </td>
                         {% else %}
                         <td
                             class="text-left"
-                            value="{{docker.team_id | safe }}"
+                            value="{{ docker.team_id }}"
                         >
-                            {{docker.user_id | safe }}
+                            {{ docker.user_id }}
                         </td>
                         {% endif %}
                         <td
